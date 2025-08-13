@@ -213,6 +213,24 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 			if m.focused < 0 {
 				m.focused = len(m.txOptions) - 1
 			}
+
+		case "enter":
+			// Execute the focused transaction type
+			if len(m.txOptions) > 0 && m.focused < len(m.txOptions) {
+				selectedTx := m.txOptions[m.focused]
+				if selectedTx.Chain == "COSMOS" {
+					m.sending = true
+					m.lastTxTime = time.Now()
+					m.addHistory("FIRING Cosmos transaction")
+					return m, m.sendTransaction(m.focused)
+				} else if selectedTx.Chain == "EVM" {
+					// Initialize transaction selector with pre-signed transactions
+					m.txSelector.Init(m.privateKey, m.evmRPC)
+					m.showTxSelector = true
+					m.addHistory("Opening EVM transaction selector")
+					return m, nil
+				}
+			}
 		}
 
 	case SendResultMsg:
@@ -407,7 +425,7 @@ func (m HtopDashboard) View() string {
 	}
 
 	// Footer (last line)
-	footer := footerStyle.Render("F1:Help  C:Cosmos  E:EVM Selector  R:Refresh  Q:Quit")
+	footer := footerStyle.Render("↑/↓:Navigate  Enter:Select  C:Cosmos  E:EVM  R:Refresh  Q:Quit")
 	footerLen := len(stripAnsi(footer))
 	footerPadding := m.width - footerLen
 	if footerPadding < 0 {

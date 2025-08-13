@@ -201,34 +201,44 @@ func (m TxSelectorModel) Update(msg tea.Msg) (TxSelectorModel, tea.Cmd) {
 	case CheckReceiptTickMsg:
 		// Check specific transaction and continue checking if not confirmed
 		txIndex := msg.TxIndex
-		if status, exists := m.txStatuses[txIndex]; exists && status.Checking && !status.Confirmed {
-			// Continue checking this specific transaction
-			return m, tea.Batch(
-				m.checkSpecificTransactionReceipt(txIndex),
-				tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-					return CheckReceiptTickMsg{TxIndex: txIndex}
-				}),
-			)
+		if status, exists := m.txStatuses[txIndex]; exists && status.Checking && !status.Confirmed && status.Hash != "" {
+			// Only check the receipt, don't schedule next tick yet
+			return m, m.checkSpecificTransactionReceipt(txIndex)
 		}
+		// If transaction is already confirmed or not checking, stop the ticker
 
 	case TxConfirmedMsg:
 		// Handle confirmation result for specific transaction
-		if status, exists := m.txStatuses[msg.TxIndex]; exists {
+		if status, exists := m.txStatuses[msg.TxIndex]; exists && msg.Hash != "" {
 			if msg.Err != nil {
-				m.addHistory(fmt.Sprintf("Receipt check failed for tx %d: %v", msg.TxIndex+1, msg.Err))
-				// Keep checking - the goroutine will retry
+				// Log error and continue checking
+				if status.Hash != "" {
+					m.addHistory(fmt.Sprintf("Receipt check failed for tx %d: %v", msg.TxIndex+1, msg.Err))
+				}
+				// Schedule next check only if still checking
+				if status.Checking && !status.Confirmed {
+					return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+						return CheckReceiptTickMsg{TxIndex: msg.TxIndex}
+					})
+				}
 			} else if msg.Confirmed {
 				// Mark as confirmed and stop checking
 				status.Confirmed = true
 				status.Checking = false
 				m.txStatuses[msg.TxIndex] = status
 				duration := time.Since(m.lastTxTime)
-				m.addHistory(fmt.Sprintf("✅ CONFIRMED tx %d: %s (%.2fs)", msg.TxIndex+1, msg.Hash, duration.Seconds()))
+				m.addHistory(fmt.Sprintf("CONFIRMED tx %d: %s (%.2fs)", msg.TxIndex+1, msg.Hash, duration.Seconds()))
+				// Don't schedule more checks for this transaction
 			} else {
-				// Still waiting - the goroutine will continue checking
-				m.addHistory(fmt.Sprintf("Still waiting for tx %d confirmation...", msg.TxIndex+1))
+				// Not confirmed yet, schedule next check
+				if status.Checking && !status.Confirmed {
+					return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+						return CheckReceiptTickMsg{TxIndex: msg.TxIndex}
+					})
+				}
 			}
 		}
+		// Ignore empty results from already confirmed transactions
 	}
 
 	return m, nil
@@ -255,7 +265,8 @@ func (m TxSelectorModel) startReceiptChecking(txIndex int, txHash string) tea.Cm
 
 func (m TxSelectorModel) checkSpecificTransactionReceipt(txIndex int) tea.Cmd {
 	return func() tea.Msg {
-		if status, exists := m.txStatuses[txIndex]; exists && status.Hash != "" {
+		if status, exists := m.txStatuses[txIndex]; exists && status.Hash != "" && !status.Confirmed {
+			// Only check if transaction hasn't been confirmed yet
 			confirmed, err := GetTransactionReceipt(m.evmRPC, status.Hash)
 			return TxConfirmedMsg{
 				TxIndex:   txIndex,
@@ -264,7 +275,8 @@ func (m TxSelectorModel) checkSpecificTransactionReceipt(txIndex int) tea.Cmd {
 				Err:       err,
 			}
 		}
-		return TxConfirmedMsg{TxIndex: txIndex, Err: fmt.Errorf("transaction not found")}
+		// Don't check if already confirmed or transaction not found
+		return TxConfirmedMsg{TxIndex: txIndex, Hash: "", Confirmed: false, Err: nil}
 	}
 }
 
