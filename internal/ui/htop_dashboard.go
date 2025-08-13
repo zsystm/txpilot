@@ -24,6 +24,8 @@ type HtopDashboard struct {
 	lastTxTime     time.Time
 	preSignedTxs   []*types.Transaction // Pre-signed EVM transactions
 	currentTxIndex int                  // Current transaction index for pre-signed txs
+	showTxSelector bool                 // Whether to show transaction selector
+	txSelector     TxSelectorModel      // Transaction selector model
 }
 
 // htop-style colors
@@ -84,6 +86,8 @@ func NewHtopDashboard() HtopDashboard {
 		height:         24,
 		preSignedTxs:   []*types.Transaction{},
 		currentTxIndex: 0,
+		showTxSelector: false,
+		txSelector:     NewTxSelectorModel(),
 	}
 }
 
@@ -93,6 +97,7 @@ func (m *HtopDashboard) Init(pk, cosmosRPC, evmRPC string) {
 	m.evmRPC = evmRPC
 	m.prepareTxOptions()
 	m.createPreSignedTransactions()
+	m.txSelector.Init(pk, evmRPC)
 	m.ready = true
 	m.addHistory("System ready")
 }
@@ -170,6 +175,21 @@ func (m *HtopDashboard) addHistory(msg string) {
 }
 
 func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
+	// If showing transaction selector, delegate to it
+	if m.showTxSelector {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if msg.String() == "esc" || msg.String() == "b" {
+				m.showTxSelector = false
+				return m, nil
+			}
+		}
+
+		var cmd tea.Cmd
+		m.txSelector, cmd = m.txSelector.Update(msg)
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -197,10 +217,9 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 
 		case "e", "E":
 			if len(m.txOptions) > 1 && m.txOptions[1].Chain == "EVM" {
-				m.sending = true
-				m.lastTxTime = time.Now()
-				m.addHistory("FIRING EVM transaction")
-				return m, m.sendPreSignedTransaction()
+				m.showTxSelector = true
+				m.addHistory("Opening EVM transaction selector")
+				return m, nil
 			}
 
 		case "r", "R":
@@ -302,6 +321,11 @@ func (m HtopDashboard) sendPreSignedTransaction() tea.Cmd {
 func (m HtopDashboard) View() string {
 	if !m.ready {
 		return "Initializing..."
+	}
+
+	// Show transaction selector if active
+	if m.showTxSelector {
+		return m.txSelector.View()
 	}
 
 	// Fixed layout like htop
@@ -448,7 +472,7 @@ func (m HtopDashboard) View() string {
 	}
 
 	// Footer (last line)
-	footer := footerStyle.Render("F1:Help  C:Cosmos  E:EVM  R:Refresh  Q:Quit")
+	footer := footerStyle.Render("F1:Help  C:Cosmos  E:EVM Selector  R:Refresh  Q:Quit")
 	footerLen := len(stripAnsi(footer))
 	footerPadding := m.width - footerLen
 	if footerPadding < 0 {

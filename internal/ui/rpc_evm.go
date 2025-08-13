@@ -366,6 +366,32 @@ func SendPreSignedEVMTransaction(rpcURL string, tx *types.Transaction) (string, 
 	return txHash, nil
 }
 
+// GetTransactionReceipt checks if a transaction has been confirmed
+func GetTransactionReceipt(rpcURL, txHash string) (bool, error) {
+	result, err := callEVMRPC(rpcURL, "eth_getTransactionReceipt", []interface{}{txHash})
+	if err != nil {
+		return false, err
+	}
+
+	// If result is null, transaction is not yet mined
+	if string(result) == "null" {
+		return false, nil
+	}
+
+	var receipt map[string]interface{}
+	if err := json.Unmarshal(result, &receipt); err != nil {
+		return false, err
+	}
+
+	// Check if transaction was successful (status "0x1")
+	status, exists := receipt["status"].(string)
+	if !exists {
+		return false, fmt.Errorf("no status in receipt")
+	}
+
+	return status == "0x1", nil
+}
+
 func buildEVMTransaction(to, value, gas, gasPrice, nonce, chainID string) []byte {
 	nonceInt := parseUint64(nonce)
 	gasPriceInt := parseUint64(gasPrice)
