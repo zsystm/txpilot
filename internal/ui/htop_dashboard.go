@@ -96,8 +96,7 @@ func (m *HtopDashboard) Init(pk, cosmosRPC, evmRPC string) {
 	m.cosmosRPC = cosmosRPC
 	m.evmRPC = evmRPC
 	m.prepareTxOptions()
-	m.createPreSignedTransactions()
-	m.txSelector.Init(pk, evmRPC)
+	// Don't create pre-signed transactions here - do it when entering EVM selector
 	m.ready = true
 	m.addHistory("System ready")
 }
@@ -140,28 +139,6 @@ func (m *HtopDashboard) prepareTxOptions() {
 		Key:         "e",
 		Ready:       true,
 	})
-}
-
-func (m *HtopDashboard) createPreSignedTransactions() {
-	// Create 10 pre-signed EVM transactions with incremental nonces
-	randomTo := GenerateRandomEVMAddress()
-
-	preSignedTxs, err := CreatePreSignedEVMTransactions(
-		m.privateKey,
-		m.evmRPC,
-		randomTo,
-		"100000000000000000", // 0.1 ETH in wei
-		10,                   // Create 10 pre-signed transactions
-	)
-
-	if err != nil {
-		m.addHistory(fmt.Sprintf("WARNING: Failed to create pre-signed txs: %v", err))
-		m.preSignedTxs = []*types.Transaction{}
-	} else {
-		m.preSignedTxs = preSignedTxs
-		m.currentTxIndex = 0
-		m.addHistory(fmt.Sprintf("Created %d pre-signed EVM transactions", len(preSignedTxs)))
-	}
 }
 
 func (m *HtopDashboard) addHistory(msg string) {
@@ -217,6 +194,8 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 
 		case "e", "E":
 			if len(m.txOptions) > 1 && m.txOptions[1].Chain == "EVM" {
+				// Initialize transaction selector with pre-signed transactions
+				m.txSelector.Init(m.privateKey, m.evmRPC)
 				m.showTxSelector = true
 				m.addHistory("Opening EVM transaction selector")
 				return m, nil
@@ -224,8 +203,7 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 
 		case "r", "R":
 			m.prepareTxOptions()
-			m.createPreSignedTransactions()
-			m.addHistory("Transactions and pre-signed txs refreshed")
+			m.addHistory("Transactions refreshed")
 
 		case "j", "down":
 			m.focused = (m.focused + 1) % len(m.txOptions)
@@ -244,17 +222,6 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 			m.addHistory(fmt.Sprintf("FAILED: %s (%.2fs)", msg.Err.Error(), duration.Seconds()))
 		} else {
 			m.addHistory(fmt.Sprintf("SUCCESS: %s (%.2fs)", truncateHash(msg.Hash), duration.Seconds()))
-			// If this was a pre-signed EVM transaction, increment the index
-			if strings.Contains(msg.Hash, "0x") {
-				m.currentTxIndex++
-				remaining := len(m.preSignedTxs) - m.currentTxIndex
-				if remaining > 0 {
-					m.addHistory(fmt.Sprintf("Pre-signed txs remaining: %d", remaining))
-				} else {
-					m.addHistory("All pre-signed transactions used - creating new batch")
-					m.createPreSignedTransactions()
-				}
-			}
 		}
 		m.prepareTxOptions()
 	}
@@ -429,46 +396,14 @@ func (m HtopDashboard) View() string {
 		lineNum++
 	}
 
-	// History section header
-	histHeader := frameHeaderStyle.Render("Transaction History")
-	histHeaderLen := len(stripAnsi(histHeader))
-	histPadding := m.width - histHeaderLen
-	if histPadding < 0 {
-		histPadding = 0
-	}
-	lines[lineNum] = histHeader + strings.Repeat(" ", histPadding)
-	lineNum++
-
-	// History lines
-	historyStart := lineNum
-	historyLines := 6 // Fixed number of history lines
-
-	// Show last entries
-	startIdx := 0
-	if len(m.history) > historyLines {
-		startIdx = len(m.history) - historyLines
-	}
-
-	for i := 0; i < historyLines; i++ {
-		if startIdx+i < len(m.history) {
-			hist := m.history[startIdx+i]
-			if m.width > 5 && len(hist) > m.width-2 {
-				hist = hist[:m.width-5] + "..."
-			}
-			histContent := contentStyle.Render("  " + hist)
-			histContentLen := len(stripAnsi(histContent))
-			histContentPadding := m.width - histContentLen
-			if histContentPadding < 0 {
-				histContentPadding = 0
-			}
-			lines[historyStart+i] = histContent + strings.Repeat(" ", histContentPadding)
+	// Fill remaining space
+	for lineNum < m.height-1 {
+		if m.width > 0 {
+			lines[lineNum] = strings.Repeat(" ", m.width)
 		} else {
-			if m.width > 0 {
-				lines[historyStart+i] = strings.Repeat(" ", m.width)
-			} else {
-				lines[historyStart+i] = ""
-			}
+			lines[lineNum] = ""
 		}
+		lineNum++
 	}
 
 	// Footer (last line)

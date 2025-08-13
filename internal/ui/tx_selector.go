@@ -13,25 +13,24 @@ import (
 )
 
 type TxSelectorModel struct {
-	ready           bool
-	focused         int
-	preSignedTxs    []*types.Transaction
-	privateKey      string
-	evmRPC          string
-	width           int
-	height          int
-	sending         bool
-	lastTxTime      time.Time
-	history         []string
-	pendingTxHash   string
-	checkingReceipt bool
-	txStatuses      map[int]TxStatus // Track status of each transaction
+	ready        bool
+	focused      int
+	preSignedTxs []*types.Transaction
+	privateKey   string
+	evmRPC       string
+	width        int
+	height       int
+	sending      bool
+	lastTxTime   time.Time
+	history      []string
+	txStatuses   map[int]TxStatus // Track status of each transaction
 }
 
 type TxStatus struct {
 	Sent      bool
 	Confirmed bool
 	Hash      string
+	Checking  bool // Whether we're currently checking this transaction
 }
 
 type TxSentMsg struct {
@@ -40,12 +39,15 @@ type TxSentMsg struct {
 }
 
 type TxConfirmedMsg struct {
+	TxIndex   int // Which transaction index this result is for
 	Hash      string
 	Confirmed bool
 	Err       error
 }
 
-type CheckReceiptTickMsg struct{}
+type CheckReceiptTickMsg struct {
+	TxIndex int // Which transaction to check
+}
 
 // Colors for transaction selector
 var (
@@ -76,14 +78,13 @@ var (
 
 func NewTxSelectorModel() TxSelectorModel {
 	return TxSelectorModel{
-		preSignedTxs:    []*types.Transaction{},
-		focused:         0,
-		width:           80,
-		height:          24,
-		history:         []string{},
-		sending:         false,
-		checkingReceipt: false,
-		txStatuses:      make(map[int]TxStatus),
+		preSignedTxs: []*types.Transaction{},
+		focused:      0,
+		width:        80,
+		height:       24,
+		history:      []string{},
+		sending:      false,
+		txStatuses:   make(map[int]TxStatus),
 	}
 }
 
@@ -115,7 +116,7 @@ func (m *TxSelectorModel) createPreSignedTransactions() {
 		// Reset transaction statuses
 		m.txStatuses = make(map[int]TxStatus)
 		for i := range preSignedTxs {
-			m.txStatuses[i] = TxStatus{Sent: false, Confirmed: false, Hash: ""}
+			m.txStatuses[i] = TxStatus{Sent: false, Confirmed: false, Hash: "", Checking: false}
 		}
 		m.addHistory(fmt.Sprintf("Created %d pre-signed EVM transactions", len(preSignedTxs)))
 	}
@@ -182,55 +183,51 @@ func (m TxSelectorModel) Update(msg tea.Msg) (TxSelectorModel, tea.Cmd) {
 			duration := time.Since(m.lastTxTime)
 			m.addHistory(fmt.Sprintf("FAILED: %s (%.2fs)", msg.Err.Error(), duration.Seconds()))
 		} else {
-			// Mark transaction as sent
+			// Mark transaction as sent and start checking
 			if status, exists := m.txStatuses[m.focused]; exists {
 				status.Sent = true
 				status.Hash = msg.Hash
+				status.Checking = true
 				m.txStatuses[m.focused] = status
 			}
 			m.addHistory(fmt.Sprintf("Transaction sent: %s", msg.Hash))
 			m.addHistory("Waiting for confirmation...")
-			m.pendingTxHash = msg.Hash
-			m.checkingReceipt = true
-			// Start checking receipt every 2 seconds
-			return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-				return CheckReceiptTickMsg{}
-			})
+
+			// Start independent goroutine for this transaction
+			txIndex := m.focused
+			return m, m.startReceiptChecking(txIndex, msg.Hash)
 		}
 
 	case CheckReceiptTickMsg:
-		if m.checkingReceipt && m.pendingTxHash != "" {
-			return m, m.checkTransactionReceipt()
+		// Check specific transaction and continue checking if not confirmed
+		txIndex := msg.TxIndex
+		if status, exists := m.txStatuses[txIndex]; exists && status.Checking && !status.Confirmed {
+			// Continue checking this specific transaction
+			return m, tea.Batch(
+				m.checkSpecificTransactionReceipt(txIndex),
+				tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+					return CheckReceiptTickMsg{TxIndex: txIndex}
+				}),
+			)
 		}
 
 	case TxConfirmedMsg:
-		m.checkingReceipt = false
-		duration := time.Since(m.lastTxTime)
-		if msg.Err != nil {
-			m.addHistory(fmt.Sprintf("Receipt check failed: %v", msg.Err))
-			// Continue checking
-			if m.pendingTxHash != "" {
-				return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-					return CheckReceiptTickMsg{}
-				})
+		// Handle confirmation result for specific transaction
+		if status, exists := m.txStatuses[msg.TxIndex]; exists {
+			if msg.Err != nil {
+				m.addHistory(fmt.Sprintf("Receipt check failed for tx %d: %v", msg.TxIndex+1, msg.Err))
+				// Keep checking - the goroutine will retry
+			} else if msg.Confirmed {
+				// Mark as confirmed and stop checking
+				status.Confirmed = true
+				status.Checking = false
+				m.txStatuses[msg.TxIndex] = status
+				duration := time.Since(m.lastTxTime)
+				m.addHistory(fmt.Sprintf("✅ CONFIRMED tx %d: %s (%.2fs)", msg.TxIndex+1, msg.Hash, duration.Seconds()))
+			} else {
+				// Still waiting - the goroutine will continue checking
+				m.addHistory(fmt.Sprintf("Still waiting for tx %d confirmation...", msg.TxIndex+1))
 			}
-		} else if msg.Confirmed {
-			// Find the transaction index by hash and mark as confirmed
-			for i, status := range m.txStatuses {
-				if status.Hash == msg.Hash {
-					status.Confirmed = true
-					m.txStatuses[i] = status
-					break
-				}
-			}
-			m.addHistory(fmt.Sprintf("✅ CONFIRMED: %s (%.2fs)", msg.Hash, duration.Seconds()))
-			m.pendingTxHash = ""
-		} else {
-			m.addHistory("Still waiting for confirmation...")
-			// Continue checking
-			return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-				return CheckReceiptTickMsg{}
-			})
 		}
 	}
 
@@ -249,10 +246,25 @@ func (m TxSelectorModel) sendSelectedTransaction() tea.Cmd {
 	}
 }
 
-func (m TxSelectorModel) checkTransactionReceipt() tea.Cmd {
+func (m TxSelectorModel) startReceiptChecking(txIndex int, txHash string) tea.Cmd {
+	// Start independent ticker for this transaction
+	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+		return CheckReceiptTickMsg{TxIndex: txIndex}
+	})
+}
+
+func (m TxSelectorModel) checkSpecificTransactionReceipt(txIndex int) tea.Cmd {
 	return func() tea.Msg {
-		confirmed, err := GetTransactionReceipt(m.evmRPC, m.pendingTxHash)
-		return TxConfirmedMsg{Hash: m.pendingTxHash, Confirmed: confirmed, Err: err}
+		if status, exists := m.txStatuses[txIndex]; exists && status.Hash != "" {
+			confirmed, err := GetTransactionReceipt(m.evmRPC, status.Hash)
+			return TxConfirmedMsg{
+				TxIndex:   txIndex,
+				Hash:      status.Hash,
+				Confirmed: confirmed,
+				Err:       err,
+			}
+		}
+		return TxConfirmedMsg{TxIndex: txIndex, Err: fmt.Errorf("transaction not found")}
 	}
 }
 
@@ -337,7 +349,7 @@ func (m TxSelectorModel) View() string {
 		sendingIndicator := ""
 		if m.sending && i == m.focused {
 			sendingIndicator = " 📡"
-		} else if m.checkingReceipt && status.Hash == m.pendingTxHash {
+		} else if status.Checking && !status.Confirmed {
 			sendingIndicator = " ⏳"
 		}
 
