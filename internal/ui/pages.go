@@ -13,36 +13,36 @@ import (
 
 var (
 	titleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("86")).
-		Background(lipgloss.Color("235")).
-		Padding(0, 2).
-		MarginBottom(1)
-	
+			Bold(true).
+			Foreground(lipgloss.Color("86")).
+			Background(lipgloss.Color("235")).
+			Padding(0, 2).
+			MarginBottom(1)
+
 	labelStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241"))
-	
+			Foreground(lipgloss.Color("241"))
+
 	okStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("42"))
-	
+
 	errStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("196"))
-	
+			Bold(true).
+			Foreground(lipgloss.Color("196"))
+
 	boxStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
-		Padding(1, 2).
-		MarginTop(1).
-		MarginBottom(1)
-	
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62")).
+			Padding(1, 2).
+			MarginTop(1).
+			MarginBottom(1)
+
 	inputStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("205"))
-	
+			Foreground(lipgloss.Color("205"))
+
 	highlightStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("170"))
+			Bold(true).
+			Foreground(lipgloss.Color("170"))
 )
 
 // ---------- Welcome ----------
@@ -67,24 +67,24 @@ func (m WelcomeModel) View() string {
 		Foreground(lipgloss.Color("86")).
 		MarginBottom(2).
 		Render("🚀 TxPilot")
-	
+
 	subtitle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245")).
 		MarginBottom(1).
 		Render("Multi-Chain Transaction Wizard")
-	
+
 	instructions := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("250")).
 		Bold(true).
 		MarginTop(2).
 		Render("Press Enter to start")
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
 		subtitle,
 		instructions,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -116,14 +116,14 @@ func NewMenu(label string, items []string) MenuModel {
 	delegate.Styles.NormalTitle = lipgloss.NewStyle().
 		PaddingLeft(3).
 		Foreground(lipgloss.Color("250"))
-	
+
 	l := list.New([]list.Item{}, delegate, 40, len(items)+2)
 	l.SetShowHelp(false)
 	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetShowPagination(false)
 	l.SetFilteringEnabled(false)
-	
+
 	m := MenuModel{label: label, list: l}
 	if len(items) > 0 {
 		m.SetItems(items)
@@ -161,19 +161,19 @@ func (m MenuModel) Update(msg tea.Msg) (MenuModel, tea.Cmd) {
 
 func (m MenuModel) View() string {
 	title := titleStyle.Render("📋 " + m.label)
-	
+
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Italic(true).
 		MarginTop(1).
 		Render("↑/↓ to navigate • Enter to select")
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		m.list.View(),
 		hint,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -208,30 +208,30 @@ func (m PKModel) Update(msg tea.Msg) (PKModel, tea.Cmd) {
 
 func (m PKModel) View() string {
 	title := titleStyle.Render("🔑 Enter Private Key")
-	
+
 	description := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245")).
 		MarginBottom(2).
 		Render("Enter your secp256k1 private key in hex format")
-	
+
 	warning := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("214")).
 		Bold(true).
 		MarginBottom(2).
 		Render("⚠️  Your key will be hidden after this step")
-	
+
 	inputBox := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(0, 1).
 		Render(m.input.View())
-	
+
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Italic(true).
 		MarginTop(2).
 		Render("Press Enter to continue")
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		description,
@@ -239,7 +239,7 @@ func (m PKModel) View() string {
 		inputBox,
 		hint,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -268,7 +268,7 @@ func (m *ParamsModel) ResetFor(txType string, state SharedState) {
 	default:
 		m.setFields([]string{"param1", "param2"})
 	}
-	
+
 	// Auto-fill parameters
 	cachedRPC := GetCachedRPC(state.Chain)
 	autoFillInput := AutoFillInput{
@@ -276,7 +276,7 @@ func (m *ParamsModel) ResetFor(txType string, state SharedState) {
 		PKHex:  state.PK,
 		RPCURL: cachedRPC,
 	}
-	
+
 	autoFilled, err := AutoFillParams(autoFillInput)
 	if err != nil {
 		m.errorMessage = "Auto-fill error: " + err.Error()
@@ -288,7 +288,7 @@ func (m *ParamsModel) ResetFor(txType string, state SharedState) {
 			}
 		}
 	}
-	
+
 	// Find first editable field and focus it
 	for i := range m.fields {
 		if !m.readOnly[i] {
@@ -297,7 +297,7 @@ func (m *ParamsModel) ResetFor(txType string, state SharedState) {
 			break
 		}
 	}
-	
+
 	m.done = false
 }
 
@@ -305,7 +305,7 @@ func (m *ParamsModel) setFields(labels []string) {
 	m.labels = labels
 	m.fields = make([]textinput.Model, len(labels))
 	m.readOnly = make([]bool, len(labels))
-	
+
 	for i, lab := range labels {
 		ti := textinput.New()
 		ti.Placeholder = lab
@@ -342,7 +342,7 @@ func (m ParamsModel) Update(msg tea.Msg) (ParamsModel, tea.Cmd) {
 			return m, nil
 		}
 	}
-	
+
 	// Only update the current focused field if it's editable
 	var cmds []tea.Cmd
 	if !m.readOnly[m.idx] {
@@ -364,9 +364,9 @@ func (m ParamsModel) findNextEditableField(currentIdx int) int {
 
 func (m ParamsModel) View() string {
 	title := titleStyle.Render("📝 Transaction Parameters")
-	
+
 	var fields []string
-	
+
 	if m.errorMessage != "" {
 		errorBox := lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
@@ -376,17 +376,17 @@ func (m ParamsModel) View() string {
 			Render(errStyle.Render("⚠️ " + m.errorMessage))
 		fields = append(fields, errorBox)
 	}
-	
+
 	for i, f := range m.fields {
 		lab := m.labels[i]
 		var fieldView string
-		
+
 		if m.readOnly[i] {
 			val := f.Value()
 			if val == "" {
 				val = "<auto-generated>"
 			}
-			
+
 			readOnlyBox := lipgloss.NewStyle().
 				Border(lipgloss.NormalBorder()).
 				BorderForeground(lipgloss.Color("238")).
@@ -405,7 +405,7 @@ func (m ParamsModel) View() string {
 			if isActive {
 				borderColor = "86"
 			}
-			
+
 			editableBox := lipgloss.NewStyle().
 				Border(lipgloss.NormalBorder()).
 				BorderForeground(lipgloss.Color(borderColor)).
@@ -419,20 +419,20 @@ func (m ParamsModel) View() string {
 				)
 			fieldView = editableBox
 		}
-		
+
 		fields = append(fields, fieldView)
 	}
-	
+
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Italic(true).
 		MarginTop(2).
 		Render("Press Enter to advance • Final Enter to confirm")
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		append([]string{title}, append(fields, hint)...)...,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -469,7 +469,7 @@ func (m ConfirmModel) Update(msg tea.Msg) (ConfirmModel, tea.Cmd) {
 
 func (m ConfirmModel) View() string {
 	title := titleStyle.Render("✅ Confirm Transaction")
-	
+
 	summaryBox := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(lipgloss.Color("86")).
@@ -477,25 +477,25 @@ func (m ConfirmModel) View() string {
 		MarginTop(2).
 		MarginBottom(2).
 		Render(m.summary)
-	
+
 	warning := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("214")).
 		Bold(true).
 		MarginBottom(2).
 		Render("⚠️  This action cannot be undone")
-	
+
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("42")).
 		Bold(true).
 		Render("Press Enter to send transaction")
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		summaryBox,
 		warning,
 		hint,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -526,24 +526,24 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 
 func (m ProgressModel) View() string {
 	title := titleStyle.Render("⏳ Sending Transaction...")
-	
+
 	spinner := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("86")).
 		Bold(true).
 		MarginTop(2).
 		MarginBottom(2).
 		Render("Broadcasting to network...")
-	
+
 	progressBar := lipgloss.NewStyle().
 		Padding(1, 0).
 		Render(m.bar.ViewAs(0.6))
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		title,
 		spinner,
 		progressBar,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -563,7 +563,7 @@ func (m ResultModel) Update(msg tea.Msg) (ResultModel, tea.Cmd) { return m, nil 
 func (m ResultModel) View() string {
 	var title, icon, message, details string
 	var messageStyle lipgloss.Style
-	
+
 	if m.err != nil {
 		title = titleStyle.Render("❌ Transaction Failed")
 		icon = "🚫"
@@ -577,7 +577,7 @@ func (m ResultModel) View() string {
 		details = m.hash
 		messageStyle = okStyle
 	}
-	
+
 	resultBox := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(func() lipgloss.Color {
@@ -597,18 +597,18 @@ func (m ResultModel) View() string {
 				messageStyle.Render(details),
 			),
 		)
-	
+
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Italic(true).
 		Render(fmt.Sprintf("Press %s to send another transaction", keyHome))
-	
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		resultBox,
 		hint,
 	)
-	
+
 	return boxStyle.Render(content)
 }
 
@@ -621,23 +621,23 @@ func HelpBar() string {
 		Background(lipgloss.Color("235")).
 		Padding(0, 1).
 		Render("🚀 TxPilot")
-	
+
 	keys := []string{
 		lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Ctrl+C") + " Quit",
 		lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render("Ctrl+X") + " Home",
 		lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render("Esc") + " Back",
 		lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("Enter") + " Next",
 	}
-	
+
 	helpText := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245")).
 		Render(strings.Join(keys, " • "))
-	
+
 	bar := lipgloss.NewStyle().
 		Background(lipgloss.Color("236")).
 		Padding(0, 2).
 		Width(80).
 		Render(logo + lipgloss.PlaceHorizontal(60, lipgloss.Right, helpText))
-	
+
 	return bar
 }

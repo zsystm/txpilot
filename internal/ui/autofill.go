@@ -28,34 +28,34 @@ func AutoFillParams(in AutoFillInput) (AutoFillOutput, error) {
 
 func autoFillCosmosBankSend(in AutoFillInput) (AutoFillOutput, error) {
 	out := make(AutoFillOutput)
-	
+
 	privateKey, err := ParsePrivateKey(in.PKHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
-	
+
 	fromAddr, err := DeriveCosmosAddress(privateKey, "cosmos")
 	if err != nil {
 		fromAddr = "cosmos1placeholder"
 	}
 	out["from_addr"] = fromAddr
-	
+
 	hrp, err := ExtractHRP(fromAddr)
 	if err != nil {
 		hrp = "cosmos"
 	}
-	
+
 	toAddr, err := GenerateRandomCosmosAddress(hrp)
 	if err != nil {
 		toAddr = hrp + "1randomaddress"
 	}
 	out["to_addr"] = toAddr
-	
+
 	out["amount"] = "1000uatom"
-	
+
 	if in.RPCURL != "" {
 		out["node(rpc)"] = in.RPCURL
-		
+
 		cacheKey := "cosmos_chain_" + in.RPCURL
 		if chainID, ok := rpcCache[cacheKey]; ok {
 			out["chain_id"] = chainID
@@ -76,31 +76,31 @@ func autoFillCosmosBankSend(in AutoFillInput) (AutoFillOutput, error) {
 		}
 		out["chain_id"] = "cosmoshub-4"
 	}
-	
+
 	return out, nil
 }
 
 func autoFillEVMTransfer(in AutoFillInput) (AutoFillOutput, error) {
 	out := make(AutoFillOutput)
-	
+
 	privateKey, err := ParsePrivateKey(in.PKHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
-	
+
 	fromAddr, err := DeriveEVMAddress(privateKey)
 	if err != nil {
 		fromAddr = "0x0000000000000000000000000000000000000000"
 	}
 	out["from"] = fromAddr
-	
+
 	out["to"] = GenerateRandomEVMAddress()
-	
+
 	out["value(wei)"] = "100000000000000"
-	
+
 	if in.RPCURL != "" {
 		out["rpc_url"] = in.RPCURL
-		
+
 		cacheKey := "evm_gas_price_" + in.RPCURL
 		if gasPrice, ok := rpcCache[cacheKey]; ok {
 			out["gas_price(wei)"] = gasPrice
@@ -113,14 +113,14 @@ func autoFillEVMTransfer(in AutoFillInput) (AutoFillOutput, error) {
 				out["gas_price(wei)"] = "20000000000"
 			}
 		}
-		
+
 		nonce, err := FetchEVMNonce(in.RPCURL, fromAddr)
 		if err == nil && nonce != "" {
 			out["nonce(optional)"] = nonce
 		} else {
 			out["nonce(optional)"] = "0"
 		}
-		
+
 		gas, err := EstimateEVMGas(in.RPCURL, fromAddr, out["to"], out["value(wei)"])
 		if err == nil && gas != "" {
 			out["gas"] = gas
@@ -137,7 +137,7 @@ func autoFillEVMTransfer(in AutoFillInput) (AutoFillOutput, error) {
 		out["gas_price(wei)"] = "20000000000"
 		out["nonce(optional)"] = "0"
 	}
-	
+
 	return out, nil
 }
 
@@ -168,7 +168,7 @@ func shouldMakeFieldReadOnly(label string) bool {
 		"from",
 		"chain_id",
 	}
-	
+
 	fieldName := strings.Split(label, "(")[0]
 	for _, ro := range readOnlyFields {
 		if fieldName == ro {

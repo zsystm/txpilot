@@ -24,33 +24,33 @@ type TxOption struct {
 }
 
 type DashboardModel struct {
-	ready        bool
-	focused      int
-	txOptions    []TxOption
-	viewport     viewport.Model
-	history      []string
-	privateKey   string
-	cosmosRPC    string
-	evmRPC       string
-	width        int
-	height       int
-	sending      bool
-	lastResult   string
+	ready      bool
+	focused    int
+	txOptions  []TxOption
+	viewport   viewport.Model
+	history    []string
+	privateKey string
+	cosmosRPC  string
+	evmRPC     string
+	width      int
+	height     int
+	sending    bool
+	lastResult string
 }
 
 var (
 	// Professional color scheme inspired by k9s/lazygit
-	bgDark    = lipgloss.Color("#1a1b26")
-	bgLight   = lipgloss.Color("#24283b")
-	fgDim     = lipgloss.Color("#565f89")
-	fgNormal  = lipgloss.Color("#a9b1d6")
-	fgBright  = lipgloss.Color("#c0caf5")
-	accent    = lipgloss.Color("#7aa2f7")
-	green     = lipgloss.Color("#9ece6a")
-	yellow    = lipgloss.Color("#e0af68")
-	red       = lipgloss.Color("#f7768e")
-	magenta   = lipgloss.Color("#bb9af7")
-	cyan      = lipgloss.Color("#7dcfff")
+	bgDark   = lipgloss.Color("#1a1b26")
+	bgLight  = lipgloss.Color("#24283b")
+	fgDim    = lipgloss.Color("#565f89")
+	fgNormal = lipgloss.Color("#a9b1d6")
+	fgBright = lipgloss.Color("#c0caf5")
+	accent   = lipgloss.Color("#7aa2f7")
+	green    = lipgloss.Color("#9ece6a")
+	yellow   = lipgloss.Color("#e0af68")
+	red      = lipgloss.Color("#f7768e")
+	magenta  = lipgloss.Color("#bb9af7")
+	cyan     = lipgloss.Color("#7dcfff")
 )
 
 func NewDashboard() DashboardModel {
@@ -80,7 +80,7 @@ func (m *DashboardModel) prepareTxOptions() {
 	// Prepare Cosmos transaction
 	cosmosAddr, _ := DeriveCosmosAddress(pkBytes, "cosmos")
 	cosmosTo, _ := GenerateRandomCosmosAddress("cosmos")
-	
+
 	m.txOptions = append(m.txOptions, TxOption{
 		Chain:       "COSMOS",
 		Type:        "bank/send",
@@ -95,7 +95,7 @@ func (m *DashboardModel) prepareTxOptions() {
 	// Prepare EVM transaction
 	evmAddr, _ := DeriveEVMAddress(pkBytes)
 	evmTo := GenerateRandomEVMAddress()
-	
+
 	m.txOptions = append(m.txOptions, TxOption{
 		Chain:       "EVM",
 		Type:        "eth/transfer",
@@ -135,12 +135,12 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 		m.height = msg.Height
 		m.viewport.Width = msg.Width - 4
 		m.viewport.Height = msg.Height - 20
-		
+
 	case tea.KeyMsg:
 		if m.sending {
 			return m, nil
 		}
-		
+
 		switch msg.String() {
 		case "c", "C":
 			// Send Cosmos transaction
@@ -149,7 +149,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 				m.addHistory("🚀 FIRING COSMOS TRANSACTION...")
 				return m, m.sendTransaction(0)
 			}
-			
+
 		case "e", "E":
 			// Send EVM transaction
 			if len(m.txOptions) > 1 && m.txOptions[1].Chain == "EVM" {
@@ -157,21 +157,21 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 				m.addHistory("🚀 FIRING EVM TRANSACTION...")
 				return m, m.sendTransaction(1)
 			}
-			
+
 		case "r", "R":
 			// Refresh/regenerate transactions
 			m.prepareTxOptions()
 			m.addHistory("♻️  Transactions refreshed with new addresses")
-			
+
 		case "j", "down":
 			m.focused = (m.focused + 1) % len(m.txOptions)
-			
+
 		case "k", "up":
 			m.focused--
 			if m.focused < 0 {
 				m.focused = len(m.txOptions) - 1
 			}
-			
+
 		case "enter", " ":
 			// Send focused transaction
 			if m.focused < len(m.txOptions) {
@@ -181,7 +181,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 				return m, m.sendTransaction(m.focused)
 			}
 		}
-		
+
 	case SendResultMsg:
 		m.sending = false
 		if msg.Err != nil {
@@ -202,7 +202,7 @@ func (m DashboardModel) sendTransaction(idx int) tea.Cmd {
 	if idx >= len(m.txOptions) {
 		return nil
 	}
-	
+
 	opt := m.txOptions[idx]
 	return func() tea.Msg {
 		state := SharedState{
@@ -211,14 +211,14 @@ func (m DashboardModel) sendTransaction(idx int) tea.Cmd {
 			PK:     m.privateKey,
 			Inputs: map[string]string{},
 		}
-		
+
 		if opt.Chain == "COSMOS" {
 			state.RPC = m.cosmosRPC
 			// Auto-fill Cosmos params
 			pkBytes, _ := ParsePrivateKey(m.privateKey)
 			fromAddr, _ := DeriveCosmosAddress(pkBytes, "cosmos")
 			toAddr, _ := GenerateRandomCosmosAddress("cosmos")
-			
+
 			state.Inputs["from_addr"] = fromAddr
 			state.Inputs["to_addr"] = toAddr
 			state.Inputs["amount"] = "1000uatom"
@@ -230,7 +230,7 @@ func (m DashboardModel) sendTransaction(idx int) tea.Cmd {
 			pkBytes, _ := ParsePrivateKey(m.privateKey)
 			fromAddr, _ := DeriveEVMAddress(pkBytes)
 			toAddr := GenerateRandomEVMAddress()
-			
+
 			state.Inputs["from"] = fromAddr
 			state.Inputs["to"] = toAddr
 			state.Inputs["value(wei)"] = "100000000000000000"
@@ -239,7 +239,7 @@ func (m DashboardModel) sendTransaction(idx int) tea.Cmd {
 			state.Inputs["nonce(optional)"] = "0"
 			state.Inputs["rpc_url"] = m.evmRPC
 		}
-		
+
 		hash, err := txSend(state)
 		return SendResultMsg{Hash: hash, Err: err}
 	}
@@ -251,35 +251,35 @@ func (m DashboardModel) View() string {
 	}
 
 	var result strings.Builder
-	
+
 	// Header
 	result.WriteString("🚀 TXPILOT - READY TO FIRE\n")
 	result.WriteString("═══════════════════════════\n\n")
-	
+
 	// Transaction options
 	for i, opt := range m.txOptions {
 		prefix := "  "
 		if i == m.focused {
 			prefix = "► "
 		}
-		
+
 		status := "✅ READY"
 		if m.sending && i == m.focused {
 			status = "🚀 FIRING"
 		}
-		
+
 		result.WriteString(fmt.Sprintf("%s[%s] %s • %s\n", prefix, opt.Key, opt.Chain, opt.Type))
 		result.WriteString(fmt.Sprintf("    %s | %s → %s | %s\n", opt.Description, opt.From, opt.To, status))
 		result.WriteString("\n")
 	}
-	
+
 	// Controls
 	result.WriteString("CONTROLS: [c]osmos [e]vm [r]efresh [q]uit\n\n")
-	
+
 	// History
 	result.WriteString("TRANSACTION HISTORY:\n")
 	result.WriteString("──────────────────\n")
-	
+
 	if len(m.history) == 0 {
 		result.WriteString("No transactions yet...\n")
 	} else {
@@ -292,19 +292,19 @@ func (m DashboardModel) View() string {
 			result.WriteString(m.history[i] + "\n")
 		}
 	}
-	
+
 	return result.String()
 }
 
 // Keymap for better key handling
 type keyMap struct {
-	Cosmos key.Binding
-	EVM    key.Binding
+	Cosmos  key.Binding
+	EVM     key.Binding
 	Refresh key.Binding
-	Up     key.Binding
-	Down   key.Binding
-	Enter  key.Binding
-	Quit   key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Enter   key.Binding
+	Quit    key.Binding
 }
 
 var keys = keyMap{

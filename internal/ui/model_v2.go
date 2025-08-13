@@ -52,7 +52,7 @@ func (m AppV2) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -97,7 +97,7 @@ func (m AppV2) updateInit(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-		
+
 	case 1: // Cosmos RPC
 		if kMsg, ok := msg.(tea.KeyMsg); ok {
 			switch kMsg.String() {
@@ -108,7 +108,7 @@ func (m AppV2) updateInit(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.initForm.cosmosURL = m.initForm.cosmosRPC.value
 				CacheRPC("cosmos", m.initForm.cosmosURL)
 				m.initForm.step = 2
-				
+
 				// Try to use cached EVM RPC
 				if cachedRPC := GetCachedRPC("evm"); cachedRPC != "" {
 					m.initForm.evmRPC.value = cachedRPC
@@ -124,7 +124,7 @@ func (m AppV2) updateInit(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-		
+
 	case 2: // EVM RPC
 		if kMsg, ok := msg.(tea.KeyMsg); ok {
 			switch kMsg.String() {
@@ -134,7 +134,7 @@ func (m AppV2) updateInit(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.initForm.evmURL = m.initForm.evmRPC.value
 				CacheRPC("evm", m.initForm.evmURL)
-				
+
 				// Initialize dashboard
 				m.dashboard.Init(m.initForm.privateKey, m.initForm.cosmosURL, m.initForm.evmURL)
 				m.stage = "dashboard"
@@ -150,7 +150,7 @@ func (m AppV2) updateInit(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	
+
 	return m, nil
 }
 
@@ -181,7 +181,7 @@ func (m AppV2) viewInit() string {
 			"",
 			"Press Enter to continue",
 		)
-		
+
 	case 1:
 		display := m.initForm.cosmosRPC.value
 		if display == "" {
@@ -198,7 +198,7 @@ func (m AppV2) viewInit() string {
 			"",
 			"Press Enter to continue",
 		)
-		
+
 	case 2:
 		display := m.initForm.evmRPC.value
 		if display == "" {
