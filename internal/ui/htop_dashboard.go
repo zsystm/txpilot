@@ -11,21 +11,23 @@ import (
 )
 
 type HtopDashboard struct {
-	ready          bool
-	focused        int
-	txOptions      []TxOption
-	history        []string
-	privateKey     string
-	cosmosRPC      string
-	evmRPC         string
-	width          int
-	height         int
-	sending        bool
-	lastTxTime     time.Time
-	preSignedTxs   []*types.Transaction // Pre-signed EVM transactions
-	currentTxIndex int                  // Current transaction index for pre-signed txs
-	showTxSelector bool                 // Whether to show transaction selector
-	txSelector     TxSelectorModel      // Transaction selector model
+	ready              bool
+	focused            int
+	txOptions          []TxOption
+	history            []string
+	privateKey         string
+	cosmosRPC          string
+	evmRPC             string
+	width              int
+	height             int
+	sending            bool
+	lastTxTime         time.Time
+	preSignedTxs       []*types.Transaction // Pre-signed EVM transactions
+	currentTxIndex     int                  // Current transaction index for pre-signed txs
+	showTxSelector     bool                 // Whether to show EVM transaction selector
+	txSelector         TxSelectorModel      // EVM Transaction selector model
+	showCosmosSelector bool                 // Whether to show Cosmos transaction selector
+	cosmosSelector     CosmosSelectorModel  // Cosmos transaction selector model
 }
 
 // htop-style colors
@@ -80,14 +82,16 @@ var (
 
 func NewHtopDashboard() HtopDashboard {
 	return HtopDashboard{
-		txOptions:      []TxOption{},
-		history:        []string{},
-		width:          80,
-		height:         24,
-		preSignedTxs:   []*types.Transaction{},
-		currentTxIndex: 0,
-		showTxSelector: false,
-		txSelector:     NewTxSelectorModel(),
+		txOptions:          []TxOption{},
+		history:            []string{},
+		width:              80,
+		height:             24,
+		preSignedTxs:       []*types.Transaction{},
+		currentTxIndex:     0,
+		showTxSelector:     false,
+		txSelector:         NewTxSelectorModel(),
+		showCosmosSelector: false,
+		cosmosSelector:     NewCosmosSelectorModel(),
 	}
 }
 
@@ -152,7 +156,7 @@ func (m *HtopDashboard) addHistory(msg string) {
 }
 
 func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
-	// If showing transaction selector, delegate to it
+	// If showing EVM transaction selector, delegate to it
 	if m.showTxSelector {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
@@ -164,6 +168,21 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 
 		var cmd tea.Cmd
 		m.txSelector, cmd = m.txSelector.Update(msg)
+		return m, cmd
+	}
+
+	// If showing Cosmos transaction selector, delegate to it
+	if m.showCosmosSelector {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if msg.String() == "esc" || msg.String() == "b" {
+				m.showCosmosSelector = false
+				return m, nil
+			}
+		}
+
+		var cmd tea.Cmd
+		m.cosmosSelector, cmd = m.cosmosSelector.Update(msg)
 		return m, cmd
 	}
 
@@ -186,10 +205,11 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 		switch msg.String() {
 		case "c", "C":
 			if len(m.txOptions) > 0 && m.txOptions[0].Chain == "COSMOS" {
-				m.sending = true
-				m.lastTxTime = time.Now()
-				m.addHistory("FIRING Cosmos transaction")
-				return m, m.sendTransaction(0)
+				// Initialize Cosmos transaction selector with pre-signed transactions
+				m.cosmosSelector.Init(m.privateKey, m.cosmosRPC)
+				m.showCosmosSelector = true
+				m.addHistory("Opening Cosmos transaction selector")
+				return m, nil
 			}
 
 		case "e", "E":
@@ -219,10 +239,11 @@ func (m HtopDashboard) Update(msg tea.Msg) (HtopDashboard, tea.Cmd) {
 			if len(m.txOptions) > 0 && m.focused < len(m.txOptions) {
 				selectedTx := m.txOptions[m.focused]
 				if selectedTx.Chain == "COSMOS" {
-					m.sending = true
-					m.lastTxTime = time.Now()
-					m.addHistory("FIRING Cosmos transaction")
-					return m, m.sendTransaction(m.focused)
+					// Initialize Cosmos transaction selector with pre-signed transactions
+					m.cosmosSelector.Init(m.privateKey, m.cosmosRPC)
+					m.showCosmosSelector = true
+					m.addHistory("Opening Cosmos transaction selector")
+					return m, nil
 				} else if selectedTx.Chain == "EVM" {
 					// Initialize transaction selector with pre-signed transactions
 					m.txSelector.Init(m.privateKey, m.evmRPC)
@@ -267,7 +288,7 @@ func (m HtopDashboard) sendTransaction(idx int) tea.Cmd {
 			state.Inputs["to_addr"] = opt.To
 			state.Inputs["amount"] = "1000uatom"
 			state.Inputs["node(rpc)"] = m.cosmosRPC
-			state.Inputs["chain_id"] = "cosmoshub-4"
+			state.Inputs["chain_id"] = "9001"
 		} else {
 			state.RPC = m.evmRPC
 			state.Inputs["from"] = opt.From
@@ -311,6 +332,11 @@ func (m HtopDashboard) View() string {
 	// Show transaction selector if active
 	if m.showTxSelector {
 		return m.txSelector.View()
+	}
+
+	// Show Cosmos transaction selector if active
+	if m.showCosmosSelector {
+		return m.cosmosSelector.View()
 	}
 
 	// Fixed layout like htop
