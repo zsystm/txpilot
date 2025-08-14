@@ -2,6 +2,8 @@
 
 A simple transaction launcher for testing blockchain scenarios like nonce gaps and transaction batching.
 
+<img src="assets/demo.gif" alt="Demo" width="600">
+
 ## Features
 
 - Interactive TUI for sending pre-defined transactions
