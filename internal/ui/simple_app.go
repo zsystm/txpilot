@@ -26,7 +26,7 @@ func NewSimpleApp() SimpleApp {
 
 	// Cosmos RPC input
 	cosmosInput := textinput.New()
-	cosmosInput.Placeholder = "http://localhost:26657"
+	cosmosInput.Placeholder = "http://localhost:1317"
 	cosmosInput.Width = 80
 
 	// EVM RPC input
@@ -79,7 +79,7 @@ func (m SimpleApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case 1: // Cosmos RPC step
 				cosmosRPC := m.cosmosInput.Value()
 				if cosmosRPC == "" {
-					cosmosRPC = "http://localhost:26657"
+					cosmosRPC = "http://localhost:1317"
 				}
 				CacheRPC("cosmos", cosmosRPC)
 				m.step = 2
@@ -99,7 +99,7 @@ func (m SimpleApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Initialize dashboard
 				cosmosRPC := m.cosmosInput.Value()
 				if cosmosRPC == "" {
-					cosmosRPC = "http://localhost:26657"
+					cosmosRPC = "http://localhost:1317"
 				}
 				m.dashboard.Init(m.pkInput.Value(), cosmosRPC, evmRPC)
 				m.step = 3
